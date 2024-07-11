@@ -1,0 +1,11 @@
+---
+title: "ST-558: Homework 5"
+author: "Kevin Krupa"
+format: html
+editor: visual
+---
+
+# Task 1: Conceptual Questions
+
+1. **What is the purpose of using cross-validation when fitting a random forest model?**
+
