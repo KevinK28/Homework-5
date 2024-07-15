@@ -9,3 +9,23 @@ editor: visual
 
 1. **What is the purpose of using cross-validation when fitting a random forest model?**
 
+  `The purpose of using cross-validation when fitting a a random forest model is that it will give us a better idea of the "best" subset of predictors to use. Doing cross validation will lower our variance and provide a more robust result`
+
+2. **Describe the bagged tree algorithm.**
+
+  `The bagged tree algorithm is is a general Bootstrap Aggregation method. For bagging, we will create a bootstrap sample (sample w/ replacement from original data) with the same number of observations as in the orinigal data. Then we would train a tree on this sample (no pruning necessary), and repeat many times (often 1,000). For each of these 1,000 samples, we will obtain our quantity/statistic of interest and then average them (or take majority vote for classification).` 
+
+3. **What is meant by a general linear model?**
+
+  `A general linear model is one that has a continous response and allows for both continuous and categorical predictors.`
+
+4. **When fitting a multiple linear regression model, what does adding an interaction term do? That is, what does it allow the model to do differently as compared to when it is not included in the model?**
+
+  `Adding an interaction term to our mlr model will allow us to explore the combined effect of two or more predictor variables. More intuitively, the effect of one variable on the response is determined by the value of that variable and the value of another variable. When using an interaction term with a continuous and categorical variable, we can see how the effect of the continous variable changes for different levels of the categorical variable.`
+
+5. **Why do we split our data into a training and test set?**
+
+  `We split our data into training and test sets because it allows us to more effectively check the robustness of our model. We use data to train a model to identify relationships and patterns; then use the test data to evaluate the performance of the model on "unseen" data. It gives us the chance to look at our model and see how it generalizes to new data.`
+
+
+# Task 2
