@@ -21,6 +21,40 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -90,8 +124,181 @@ ul.task-list li input[type="checkbox"] {
 </ol>
 <p><code>We split our data into training and test sets because it allows us to more effectively check the robustness of our model. We use data to train a model to identify relationships and patterns; then use the test data to evaluate the performance of the model on "unseen" data. It gives us the chance to look at our model and see how it generalizes to new data.</code></p>
 </section>
-<section id="task-2" class="level1">
-<h1>Task 2</h1>
+<section id="task-2-fitting-models" class="level1">
+<h1>Task 2: Fitting Models</h1>
+<p>In this task, we will be looking at a specific data set: <code>heart.csv</code>. This data set gives information about whether or not an individual has heart disease (<code>HeartDisease = 1/0</code>). It also gives more information about an individual’s health. Here is a link with more information about the data set: <a href="https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction">Heart Disease</a></p>
+<section id="eda-and-data-preparation" class="level2">
+<h2 class="anchored" data-anchor-id="eda-and-data-preparation">EDA and Data Preparation</h2>
+<p>First, we will load in this dataset:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>heart <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"heart.csv"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_tibble</span>()</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(heart)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 12
+    Age Sex   ChestPainType RestingBP Cholesterol FastingBS RestingECG MaxHR
+  &lt;int&gt; &lt;chr&gt; &lt;chr&gt;             &lt;int&gt;       &lt;int&gt;     &lt;int&gt; &lt;chr&gt;      &lt;int&gt;
+1    40 M     ATA                 140         289         0 Normal       172
+2    49 F     NAP                 160         180         0 Normal       156
+3    37 M     ATA                 130         283         0 ST            98
+4    48 F     ASY                 138         214         0 Normal       108
+5    54 M     NAP                 150         195         0 Normal       122
+6    39 M     NAP                 120         339         0 Normal       170
+# ℹ 4 more variables: ExerciseAngina &lt;chr&gt;, Oldpeak &lt;dbl&gt;, ST_Slope &lt;chr&gt;,
+#   HeartDisease &lt;int&gt;</code></pre>
+</div>
+</div>
+<p>Now that we have successfully read in the data, let’s try to quickly understand some things about our data. We will check on the missingness and summarize the data (especially relationships of variables to heart disease).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Check the missingness</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>missing <span class="ot">&lt;-</span> <span class="fu">colSums</span>(<span class="fu">is.na</span>(heart))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>missing</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>           Age            Sex  ChestPainType      RestingBP    Cholesterol 
+             0              0              0              0              0 
+     FastingBS     RestingECG          MaxHR ExerciseAngina        Oldpeak 
+             0              0              0              0              0 
+      ST_Slope   HeartDisease 
+             0              0 </code></pre>
+</div>
+</div>
+<p>There are no missing values in this data set (very unlikely in real-world), so let us start doing some data exploration/summarization</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Check numerical variable summaries</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>heartNumeric <span class="ot">&lt;-</span> heart <span class="sc">|&gt;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">where</span>(is.numeric))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(heartNumeric)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>      Age          RestingBP      Cholesterol      FastingBS     
+ Min.   :28.00   Min.   :  0.0   Min.   :  0.0   Min.   :0.0000  
+ 1st Qu.:47.00   1st Qu.:120.0   1st Qu.:173.2   1st Qu.:0.0000  
+ Median :54.00   Median :130.0   Median :223.0   Median :0.0000  
+ Mean   :53.51   Mean   :132.4   Mean   :198.8   Mean   :0.2331  
+ 3rd Qu.:60.00   3rd Qu.:140.0   3rd Qu.:267.0   3rd Qu.:0.0000  
+ Max.   :77.00   Max.   :200.0   Max.   :603.0   Max.   :1.0000  
+     MaxHR          Oldpeak         HeartDisease   
+ Min.   : 60.0   Min.   :-2.6000   Min.   :0.0000  
+ 1st Qu.:120.0   1st Qu.: 0.0000   1st Qu.:0.0000  
+ Median :138.0   Median : 0.6000   Median :1.0000  
+ Mean   :136.8   Mean   : 0.8874   Mean   :0.5534  
+ 3rd Qu.:156.0   3rd Qu.: 1.5000   3rd Qu.:1.0000  
+ Max.   :202.0   Max.   : 6.2000   Max.   :1.0000  </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Check correlation</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cor</span>(heartNumeric<span class="sc">$</span>HeartDisease, heartNumeric)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>           Age RestingBP Cholesterol FastingBS      MaxHR   Oldpeak
+[1,] 0.2820385  0.107589  -0.2327406 0.2672912 -0.4004208 0.4039507
+     HeartDisease
+[1,]            1</code></pre>
+</div>
+</div>
+<p>This is interesting, the numeric variables do not have very strong correlations to the <code>HeartDisease</code> variable. Let’s explore the non-numeric variables:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>heartCategorical <span class="ot">&lt;-</span> heart <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">!</span><span class="fu">where</span>(is.numeric), HeartDisease)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">ncol</span>(heartCategorical)) {</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  contTable <span class="ot">&lt;-</span> <span class="fu">table</span>(heartCategorical<span class="sc">$</span>HeartDisease, <span class="fu">as_vector</span>(heartCategorical[,i]))</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">colnames</span>(heartCategorical[,i]) <span class="sc">!=</span> <span class="st">"HeartDisease"</span>) {</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">"Contingency Table for Heart Disease and"</span>, <span class="fu">colnames</span>(heartCategorical[,i])))</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">print</span>(contTable)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="cn">NULL</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "Contingency Table for Heart Disease and Sex"
+   
+      F   M
+  0 143 267
+  1  50 458
+
+[1] "Contingency Table for Heart Disease and ChestPainType"
+   
+    ASY ATA NAP  TA
+  0 104 149 131  26
+  1 392  24  72  20
+
+[1] "Contingency Table for Heart Disease and RestingECG"
+   
+    LVH Normal  ST
+  0  82    267  61
+  1 106    285 117
+
+[1] "Contingency Table for Heart Disease and ExerciseAngina"
+   
+      N   Y
+  0 355  55
+  1 192 316
+
+[1] "Contingency Table for Heart Disease and ST_Slope"
+   
+    Down Flat  Up
+  0   14   79 317
+  1   49  381  78</code></pre>
+</div>
+</div>
+<p>After looking at the contingency tables for each non-numeric variable and <code>HeartDisease</code>, we can see that many of these have a strong relationship with <code>HeartDisease</code>.</p>
+<p>Now that we are done with our exploration, we will start with our analyses. Before we begin, however, we will first need to do some data manipulation. Currently, our <code>HeartDisease</code> variable is numeric. We will need to change this to a factor variable, and also remove the <code>ST_Slope</code> variable and original <code>HeartDisease</code> variable.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>heart <span class="ot">&lt;-</span> heart <span class="sc">|&gt;</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">HeartDiseaseFact =</span> <span class="fu">as.factor</span>(HeartDisease)) <span class="sc">|&gt;</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(<span class="st">"ST_Slope"</span>, <span class="st">"HeartDisease"</span>))</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(heart)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 11
+    Age Sex   ChestPainType RestingBP Cholesterol FastingBS RestingECG MaxHR
+  &lt;int&gt; &lt;chr&gt; &lt;chr&gt;             &lt;int&gt;       &lt;int&gt;     &lt;int&gt; &lt;chr&gt;      &lt;int&gt;
+1    40 M     ATA                 140         289         0 Normal       172
+2    49 F     NAP                 160         180         0 Normal       156
+3    37 M     ATA                 130         283         0 ST            98
+4    48 F     ASY                 138         214         0 Normal       108
+5    54 M     NAP                 150         195         0 Normal       122
+6    39 M     NAP                 120         339         0 Normal       170
+# ℹ 3 more variables: ExerciseAngina &lt;chr&gt;, Oldpeak &lt;dbl&gt;,
+#   HeartDiseaseFact &lt;fct&gt;</code></pre>
+</div>
+</div>
+<p>The first analysis we will be doing involves a kNN model, where we generally want to have all numeric predictors. The next step will be to take our remaining categorical predictors, and create dummy variables that are numeric.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(caret)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>catData <span class="ot">&lt;-</span> <span class="fu">dummyVars</span>(HeartDisease <span class="sc">~</span> ., <span class="at">data =</span> heartCategorical) <span class="sc">|&gt;</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">predict</span>(<span class="at">newdata =</span> heartCategorical)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>heart <span class="ot">&lt;-</span> heart <span class="sc">|&gt;</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">where</span>(is.numeric))</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>heart <span class="ot">&lt;-</span> <span class="fu">cbind</span>(heart, catData) <span class="sc">|&gt;</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_tibble</span>()</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(heart)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 20
+    Age RestingBP Cholesterol FastingBS MaxHR Oldpeak  SexF  SexM
+  &lt;int&gt;     &lt;int&gt;       &lt;int&gt;     &lt;int&gt; &lt;int&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+1    40       140         289         0   172     0       0     1
+2    49       160         180         0   156     1       1     0
+3    37       130         283         0    98     0       0     1
+4    48       138         214         0   108     1.5     1     0
+5    54       150         195         0   122     0       0     1
+6    39       120         339         0   170     0       0     1
+# ℹ 12 more variables: ChestPainTypeASY &lt;dbl&gt;, ChestPainTypeATA &lt;dbl&gt;,
+#   ChestPainTypeNAP &lt;dbl&gt;, ChestPainTypeTA &lt;dbl&gt;, RestingECGLVH &lt;dbl&gt;,
+#   RestingECGNormal &lt;dbl&gt;, RestingECGST &lt;dbl&gt;, ExerciseAnginaN &lt;dbl&gt;,
+#   ExerciseAnginaY &lt;dbl&gt;, ST_SlopeDown &lt;dbl&gt;, ST_SlopeFlat &lt;dbl&gt;,
+#   ST_SlopeUp &lt;dbl&gt;</code></pre>
+</div>
+</div>
+</section>
 </section>
 
 </main>

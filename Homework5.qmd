@@ -28,4 +28,236 @@ editor: visual
   `We split our data into training and test sets because it allows us to more effectively check the robustness of our model. We use data to train a model to identify relationships and patterns; then use the test data to evaluate the performance of the model on "unseen" data. It gives us the chance to look at our model and see how it generalizes to new data.`
 
 
-# Task 2
+# Task 2: Fitting Models
+
+In this task, we will be looking at a specific data set: `heart.csv`. This data set gives information about whether or not an individual has heart disease (`HeartDisease = 1/0`). It also gives more information about an individual's health. Here is a link with more information about the data set: <a href="https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction">Heart Disease</a>
+
+## EDA and Data Preparation
+
+First, we will load in this dataset:
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+
+heart <- read.csv("heart.csv") |>
+  as_tibble()
+
+head(heart)
+```
+
+Now that we have successfully read in the data, let's try to quickly understand some things about our data. We will check on the missingness and summarize the data (especially relationships of variables to heart disease).
+
+```{r}
+#Check the missingness
+missing <- colSums(is.na(heart))
+missing
+```
+There are no missing values in this data set (very unlikely in real-world), so let us start doing some data exploration/summarization
+
+```{r}
+#Check numerical variable summaries
+heartNumeric <- heart |>
+  select(where(is.numeric))
+
+summary(heartNumeric)
+```
+We can see that in the `RestingBP` and `Cholesterol` variables, that they have a minimum of 0. This does not make any sense, and could actually be how they denote a missing value. Let us get rid of these observations.
+
+```{r}
+heart <- heart |>
+  filter(Cholesterol != 0 | RestingBP != 0)
+```
+
+
+```{r}
+#Check correlation
+cor(heartNumeric$HeartDisease, heartNumeric)
+```
+This is interesting, the numeric variables do not have very strong correlations to the `HeartDisease` variable. Let's explore the non-numeric variables:
+
+```{r}
+heartCategorical <- heart |>
+  select(!where(is.numeric), HeartDisease)
+
+for (i in 1:ncol(heartCategorical)) {
+  contTable <- table(heartCategorical$HeartDisease, as_vector(heartCategorical[,i]))
+  if (colnames(heartCategorical[,i]) != "HeartDisease") {
+    print(paste("Contingency Table for Heart Disease and", colnames(heartCategorical[,i])))
+    print(contTable)
+    cat("\n")
+  } else {
+    NULL
+  }
+}
+```
+
+After looking at the contingency tables for each non-numeric variable and `HeartDisease`, we can see that many of these have a strong relationship with `HeartDisease`.
+
+Now that we are done with our exploration, we will start with our analyses. Before we begin, however, we will first need to do some data manipulation. Currently, our `HeartDisease` variable is numeric. We will need to change this to a factor variable, and also remove the `ST_Slope` variable and original `HeartDisease` variable.
+
+```{r}
+heart <- heart |>
+  mutate(HeartDiseaseFact = as.factor(HeartDisease)) |>
+  select(-c("ST_Slope", "HeartDisease"))
+
+head(heart)
+```
+
+The first analysis we will be doing involves a kNN model, where we generally want to have all numeric predictors. The next step will be to take our remaining categorical predictors, and create dummy variables that are numeric.
+
+```{r, warning = FALSE, message = FALSE}
+library(caret)
+
+heartCategorical <- heartCategorical |>
+  select(-c("ST_Slope"))
+
+catData <- dummyVars(HeartDisease ~ ., data = heartCategorical) |>
+  predict(newdata = heartCategorical)
+
+heartKNN <- heart |>
+  select(where(is.numeric), HeartDiseaseFact)
+
+heartKNN <- cbind(heartKNN, catData) |>
+  as_tibble()
+
+head(heartKNN)
+```
+
+## Split Data
+
+Now that we have gotten the correct data set, with dummy variables, we can now split the data into training and test sets. The training set will be comprised of 80% of the observations, and the test set will be the remaining 20% of the data.
+
+```{r}
+#set seed for reproducibility
+set.seed(100)
+
+#training/test sets
+train <- sample(1:nrow(heartKNN), size = nrow(heartKNN)*0.8)
+test  <- dplyr::setdiff(1:nrow(heartKNN), train)
+
+heartKNNTrain <- heart[train, ]
+heartKNNTest  <- heart[test, ]
+```
+
+We have successfully split our data into training and testing data sets. Now, we will start to actually build/fit models
+
+## k-Nearest-Neighbor Model
+
+For the first model, we will fit a kNN model. This will use a repeated 10 fold cross-validation, with the number of repeats being 3. We will also center and scale variables.
+
+```{r}
+#reproducibility
+set.seed(100)
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+kVals <- data.frame(k = 1:40)
+tuneGridVals <- data.frame(k = kVals)
+
+knnFit <- train(HeartDiseaseFact ~ ., data = heartKNNTrain, method = "knn",
+                trControl = trctrl, preProcess = c("center", "scale"),
+                tuneLength = 10,
+                tuneGrid = tuneGridVals)
+
+knnFit
+```
+
+We have fit our model (k = 15), so now let's make use of the test data set and look at the performance of our model.
+
+```{r}
+knnTestPred <- predict(knnFit, newdata = heartKNNTest)
+
+confusionMatrix(knnTestPred, heartKNNTest$HeartDiseaseFact)
+```
+Looking at the performance of our kNN model, it looks pretty good! We see that we have an accuracy rate of 83.15%
+
+## Logistic Regression
+
+For this section we will build three different logistic regression models. We can use the original heart data set (with `HeartDisease` as a factor and without `ST_Slope` variable). We will fit the three models on the training set and use repeated CV as above. We will not use centering and scaling here. After fitting the models, we will identify the best one and provide a basic summary of it.
+
+```{r}
+#set seed for reproducibility
+set.seed(100)
+
+#training/test sets
+train <- sample(1:nrow(heart), size = nrow(heart)*0.8)
+test  <- dplyr::setdiff(1:nrow(heart), train)
+
+heartLogTrain <- heart[train, ]
+heartLogTest  <- heart[test, ]
+```
+
+### First Logistic Regression Model
+
+The first model we will fit, will have all of the other variables as predictor variables:
+
+```{r}
+set.seed(100)
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+logFitOne <- train(HeartDiseaseFact ~ ., data = heartLogTrain, method = "glm",
+                   trControl = trctrl,
+                   tuneLength = 10)
+
+logFitOne
+```
+### Second Logisitic Regression Model
+
+This next model will include al categorical variables, except for `RestingECG`, as well as cholesterol and age.
+
+```{r}
+set.seed(100)
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+logFitTwo <- train(HeartDiseaseFact ~ Age + Cholesterol + Sex + ChestPainType + ExerciseAngina,
+                   data = heartLogTrain, method = "glm",
+                   trControl = trctrl,
+                   tuneLength = 10)
+
+logFitTwo
+```
+
+### Third Logistic Regression Model
+
+For the last logistic regression model, we will look at a model with all two-way interactions.
+
+```{r}
+set.seed(100)
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+logFitThree <- train(HeartDiseaseFact ~ . + .^2,
+                   data = heartLogTrain, method = "glm",
+                   trControl = trctrl,
+                   tuneLength = 10)
+
+logFitThree
+```
+
+### Best Model
+
+After fitting three models and checking the accuracy of each, the first model appears to be the "best". Let's provide a basic summary of it
+
+```{r}
+summary(logFitOne)
+```
+Now, let's look at how well this model performs on the test set
+
+```{r}
+logTestPred <- predict(logFitOne, newdata = heartLogTest)
+
+confusionMatrix(logTestPred, heartLogTest$HeartDiseaseFact)
+```
+## Tree Models
+
+In this section, we will look at a few different tree-based models. We are going to choose our own variable of interest (these models can accept factor/character variables) and we will use a 10-fold CV to select a best model.
+
+### Classification Tree Model
+
+
+### Random Forest Model
+
+
+### Boosted Tree Model
