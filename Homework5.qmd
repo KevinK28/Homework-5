@@ -66,14 +66,18 @@ We can see that in the `RestingBP` and `Cholesterol` variables, that they have a
 ```{r}
 heart <- heart |>
   filter(Cholesterol != 0 | RestingBP != 0)
+
+heartNumeric <- heartNumeric |>
+  filter(Cholesterol != 0 | RestingBP != 0)
 ```
 
+Now that we have gotten rid of the *"missing"* observations, we will now check the correlation between all numeric predictors and the `HeartDisease` variable:
 
 ```{r}
 #Check correlation
-cor(heartNumeric$HeartDisease, heartNumeric)
+cor(heartNumeric$HeartDisease, heartNumeric[, -7])
 ```
-This is interesting, the numeric variables do not have very strong correlations to the `HeartDisease` variable. Let's explore the non-numeric variables:
+This is interesting, none of the numeric variables have a very strong correlation to the `HeartDisease` variable. Let's explore the non-numeric variables, first, through contingency tables:
 
 ```{r}
 heartCategorical <- heart |>
@@ -93,7 +97,7 @@ for (i in 1:ncol(heartCategorical)) {
 
 After looking at the contingency tables for each non-numeric variable and `HeartDisease`, we can see that many of these have a strong relationship with `HeartDisease`.
 
-Now that we are done with our exploration, we will start with our analyses. Before we begin, however, we will first need to do some data manipulation. Currently, our `HeartDisease` variable is numeric. We will need to change this to a factor variable, and also remove the `ST_Slope` variable and original `HeartDisease` variable.
+Now that we are done with our exploration, we will start with our analyses. Before we begin, however, we will first need to do some extra data manipulation. Currently, our `HeartDisease` variable is numeric. We will need to change this to a factor variable, and also remove the `ST_Slope` variable and original `HeartDisease` variable.
 
 ```{r}
 heart <- heart |>
@@ -202,6 +206,8 @@ logFitOne <- train(HeartDiseaseFact ~ ., data = heartLogTrain, method = "glm",
 
 logFitOne
 ```
+The accuracy of the model with all predictors is pretty good, but let us see if we can improve this at all.
+
 ### Second Logisitic Regression Model
 
 This next model will include al categorical variables, except for `RestingECG`, as well as cholesterol and age.
@@ -218,23 +224,26 @@ logFitTwo <- train(HeartDiseaseFact ~ Age + Cholesterol + Sex + ChestPainType + 
 
 logFitTwo
 ```
+The accuracy of this model is pretty good once again; however, it is not as good as the first fit. Let's try something else more complex.
 
 ### Third Logistic Regression Model
 
-For the last logistic regression model, we will look at a model with all two-way interactions.
+For the last logistic regression model, we will look at a model with all numeric variables.
 
 ```{r}
 set.seed(100)
 
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
 
-logFitThree <- train(HeartDiseaseFact ~ . + .^2,
+logFitThree <- train(HeartDiseaseFact ~ RestingBP + Cholesterol + FastingBS + MaxHR + Oldpeak +
+                       Age,
                    data = heartLogTrain, method = "glm",
                    trControl = trctrl,
                    tuneLength = 10)
 
 logFitThree
 ```
+This model is the worst of the three.
 
 ### Best Model
 
@@ -256,8 +265,104 @@ In this section, we will look at a few different tree-based models. We are going
 
 ### Classification Tree Model
 
+Here, we will be creating a classification tree model for the `HeartDisease` variable. To build this model, we will use all categorical predictors as well as Age, and Cholesterol
+
+```{r}
+set.seed(100)
+
+#training/test sets
+train <- sample(1:nrow(heart), size = nrow(heart)*0.8)
+test  <- dplyr::setdiff(1:nrow(heart), train)
+
+heartTrain <- heart[train, ]
+heartTest  <- heart[test, ]
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+cpVals <- data.frame(cp = seq(0, 0.1, 0.001))
+tuneGridVals <- data.frame(cp = cpVals)
+
+classTreeFit <- train(HeartDiseaseFact ~ Age + Cholesterol + Sex + ChestPainType + RestingECG +
+                        ExerciseAngina, data = heartTrain,
+                      method = "rpart",
+                      trControl = trctrl,
+                      tuneGrid = tuneGridVals)
+
+classTreeFit
+```
+
 
 ### Random Forest Model
 
+Here, we will build a random forest model, using all of the variables in the data set as predictors
+
+```{r}
+set.seed(100)
+
+trtctrl <- trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+rfVals <- data.frame(mtry = seq(1,10))
+tuneGridVals <- data.frame(mtry = rfVals)
+
+rfTreeFit <- train(HeartDiseaseFact ~ ., data = heartTrain,
+                   method = "rf",
+                   trControl = trctrl,
+                   tuneGrid = tuneGridVals)
+
+rfTreeFit
+```
+
 
 ### Boosted Tree Model
+
+Here, we will run a boosted tree model using only the categorical variables in the model.
+
+```{r}
+set.seed(100)
+
+trtctrl <- trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+tuneGridVals <- expand.grid(n.trees = c(25, 50, 100, 200),
+                            interaction.depth = c(1, 2, 3),
+                            shrinkage = 0.1,
+                            n.minobsinnode = 10)
+
+boostTreeFit <- train(HeartDiseaseFact ~ Sex + ChestPainType + ExerciseAngina + RestingECG,
+                      data = heartTrain,
+                      method = "gbm",
+                      trControl = trctrl,
+                      tuneGrid = tuneGridVals,
+                      verbose = FALSE)
+
+boostTreeFit
+```
+
+### Results
+
+Here, we will look at the results of the final model for each of the three tree-based methods.
+
+```{r}
+#Create Predictions
+classTestPred <- predict(classTreeFit, newdata = heartTest)
+rfTestPred    <- predict(rfTreeFit, newdata = heartTest)
+boostTestPred <- predict(boostTreeFit, newdata = heartTest)
+
+```
+
+Let's first look at the classification tree performance:
+
+```{r}
+confusionMatrix(classTestPred, heartTest$HeartDiseaseFact)
+```
+
+Random Forest Performance:
+
+```{r}
+confusionMatrix(rfTestPred, heartTest$HeartDiseaseFact)
+```
+Boosted Tree Performance:
+
+```{r}
+confusionMatrix(boostTestPred, heartTest$HeartDiseaseFact)
+```
+
+## Wrap Up
+
+After reviewing the results of all the models fit above, we can see that the kNN model had the best results (in terms of accuracy).
